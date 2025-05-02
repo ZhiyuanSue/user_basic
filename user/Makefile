@@ -1,4 +1,4 @@
-unexport ARCH KERNELVERSION ROOT_DIR BUILD SCRIPT_MAKE_DIR INCLUDE_DIR CC LD AR CFLAGS ARFLAGS LDFLAGS LIBS DBG MEM_SIZE
+unexport KERNELVERSION ROOT_DIR BUILD SCRIPT_MAKE_DIR INCLUDE_DIR CC LD AR CFLAGS ARFLAGS LDFLAGS LIBS DBG MEM_SIZE
 ARCH ?= riscv64
 MODE ?= release
 CHAPTER ?= 7
@@ -49,8 +49,8 @@ endif
 binary:
 	@mkdir -p build
 	@cd build && cmake $(cmake_build_args) .. && make
-	@$(CP) src/oscomp/run-all.sh src/oscomp/text.txt build/${ARCH}/
-	@mkdir build/${ARCH}/mnt && touch build/${ARCH}/mnt/test_mount
+	@# $(CP) src/oscomp/run-all.sh src/oscomp/text.txt build/${ARCH}/
+	@# mkdir build/${ARCH}/mnt && touch build/${ARCH}/mnt/test_mount
 
 pre:
 	@rm -rf $(out_dir)
