@@ -5,6 +5,6 @@
 
 void panic(char *m)
 {
-    puts(m);
-    exit(-100);
+        puts(m);
+        exit(-100);
 }

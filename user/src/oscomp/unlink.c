@@ -13,31 +13,32 @@
 
 int test_unlink()
 {
-    TEST_START(__func__);
+        TEST_START(__func__);
 
-    char *fname = "./test_unlink";
-    int fd, ret;
+        char *fname = "./test_unlink";
+        int fd, ret;
 
-    fd = open(fname, O_CREATE | O_WRONLY);
-    assert(fd > 0);
-    close(fd);
-
-    // unlink test
-    ret = unlink(fname);
-    assert(ret == 0);
-    fd = open(fname, O_RDONLY);
-    if(fd < 0){
-        printf("  unlink success!\n");
-    }else{
-	printf("  unlink error!\n");
+        fd = open(fname, O_CREATE | O_WRONLY);
+        assert(fd > 0);
         close(fd);
-    }
-    // It's Ok if you don't delete the inode and data blocks.
 
-    TEST_END(__func__);
+        // unlink test
+        ret = unlink(fname);
+        assert(ret == 0);
+        fd = open(fname, O_RDONLY);
+        if (fd < 0) {
+                printf("  unlink success!\n");
+        } else {
+                printf("  unlink error!\n");
+                close(fd);
+        }
+        // It's Ok if you don't delete the inode and data blocks.
+
+        TEST_END(__func__);
 }
 
-int main(void) {
-	test_unlink();
-	return 0;
+int main(void)
+{
+        test_unlink();
+        return 0;
 }
