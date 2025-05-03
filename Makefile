@@ -9,4 +9,4 @@ gen_link:
 -include ${BUILD}/*.d
 ${BUILD}/link_app.o: ./link_app.S
 	@echo "CC	"$@
-	@$(CC) $(CFLAGS) -o $@ -c $< -MD -MF ${BUILD}/$*.d -MP
+	@$(CC) $(CFLAGS) -o $@ -c $<

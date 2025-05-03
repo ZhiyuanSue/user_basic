@@ -10,10 +10,10 @@ def generate_link_app(pwd,elf_dir,elf_file_list):
 	manager_str=".align 8\n	\
 .section .data.app\n \
 .global _num_app\n \
-_num_app:"
+_num_app:\n"
 
 	section_str=""
-	manager_str += " " + str(len(elf_file_list)) + "\n"
+	manager_str += "\t.quad " + str(len(elf_file_list)) + "\n"
 	for file in elf_file_list:
 		inc_bin_file = os.path.join(pwd,elf_dir,file)
 		manager_str += "\t.quad " + file + "_start\n" + "\t.quad " + file + "_end\n"
@@ -21,7 +21,7 @@ _num_app:"
 \t.global " + file + "_start\n \
 \t.global " + file + "_end\n" \
 + file + "_start:\n" \
-+ "incbin \""+ inc_bin_file +"\"\n" \
++ "\t.incbin \""+ inc_bin_file +"\"\n" \
 + file + "_end:\n"
 	
 	with open(link_app_s_file,"w") as file:
