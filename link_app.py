@@ -8,7 +8,7 @@ link_app_file_name="link_app.S"
 def generate_link_app(pwd,elf_dir,elf_file_list):
 	link_app_s_file = os.path.join(pwd,link_app_file_name)
 	manager_str="\t.align 8\n \
-\t.section .app\n \
+\t.section .data.app\n \
 \t.global _num_app\n \
 _num_app:\n"
 
