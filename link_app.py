@@ -7,7 +7,7 @@ link_app_file_name="link_app.S"
 
 def generate_link_app(pwd,elf_dir,elf_file_list):
 	link_app_s_file = os.path.join(pwd,link_app_file_name)
-	manager_str="\t.p2align 3\n \
+	manager_str="\t.p2align 4\n \
 \t.section .data.app\n \
 \t.global _num_app\n \
 _num_app:\n"
@@ -17,7 +17,7 @@ _num_app:\n"
 	for file in elf_file_list:
 		inc_bin_file = os.path.join(pwd,elf_dir,file)
 		manager_str += "\t.quad " + file + "_start\n" + "\t.quad " + file + "_end\n"
-		section_str += "\t.section .data.app\n \
+		section_str += "\t.p2align 4\n\t.section .data.app\n \
 \t.global " + file + "_start\n \
 \t.global " + file + "_end\n" \
 + file + "_start:\n" \
