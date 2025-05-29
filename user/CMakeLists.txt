@@ -15,7 +15,8 @@ set(ASM_DIR asm)
 set(BIN_DIR bin)
 
 # Toolchain
-set(PREFIX ${ARCH}-linux-gnu-)
+# set(PREFIX ${ARCH}-linux-gnu-)
+set(PREFIX ${ARCH}-linux-musl-)
 # riscv64-unknown-elf-
 
 if (${ARCH} STREQUAL x86_64)
@@ -51,7 +52,8 @@ target_include_directories(ulib PRIVATE ${ARCH_DIR})
 # Execuatble
 set(ENTRY "0x1000")
 #aux_source_directory(src SRCS)
-aux_source_directory(src/oscomp SRCS)
+# aux_source_directory(src/oscomp SRCS)
+aux_source_directory(src/ucore SRCS)
 set(EXECUTABLE_OUTPUT_PATH ${ARCH})
 foreach(PATH ${SRCS})
     get_filename_component(NAME ${PATH} NAME_WE)
