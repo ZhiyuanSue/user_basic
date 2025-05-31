@@ -7,6 +7,6 @@
 
 int main()
 {
-	puts("Hello world from user mode program!\nTest hello_world OK!");
-	return 0;
+        puts("Hello world from user mode program!\nTest hello_world OK!");
+        return 0;
 }

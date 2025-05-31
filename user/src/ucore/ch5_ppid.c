@@ -7,5 +7,5 @@
 
 int main()
 {
-	return getppid();
+        return getppid();
 }

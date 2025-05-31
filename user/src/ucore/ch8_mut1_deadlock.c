@@ -8,11 +8,11 @@
 
 int main()
 {
-	enable_deadlock_detect(1);
-	int mutex_id = mutex_create();
-	assert_eq(mutex_lock(mutex_id), 0);
-	assert_eq(mutex_lock(mutex_id), -0xdead);
-	mutex_unlock(mutex_id);
-	puts("deadlock test mutex 1 OK!");
-	return 0;
+        enable_deadlock_detect(1);
+        int mutex_id = mutex_create();
+        assert_eq(mutex_lock(mutex_id), 0);
+        assert_eq(mutex_lock(mutex_id), -0xdead);
+        mutex_unlock(mutex_id);
+        puts("deadlock test mutex 1 OK!");
+        return 0;
 }

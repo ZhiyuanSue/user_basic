@@ -9,16 +9,16 @@
 
 int main()
 {
-	int pid = getpid();
-	int ppid = getppid();
-	if (fork() == 0) {
-		int cppid = getppid();
-		assert_eq(cppid, pid);
-		printf("Test getppid OK!\n");
-		exit(0);
-	}
-	int xstate = 0;
-	wait(&xstate);
-	printf("Test getpid OK! pid = %d, ppid = %d\n", pid, ppid);
-	return 0;
+        int pid = getpid();
+        int ppid = getppid();
+        if (fork() == 0) {
+                int cppid = getppid();
+                assert_eq(cppid, pid);
+                printf("Test getppid OK!\n");
+                exit(0);
+        }
+        int xstate = 0;
+        wait(&xstate);
+        printf("Test getpid OK! pid = %d, ppid = %d\n", pid, ppid);
+        return 0;
 }

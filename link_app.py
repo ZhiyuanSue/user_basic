@@ -33,7 +33,9 @@ _num_app:\n"
 if __name__ =='__main__':
 	elf_dir = sys.argv[1]
 	pwd = os.getcwd()
-	all_items = os.listdir(elf_dir)
-	elf_files = [f for f in all_items if os.path.isfile(os.path.join(elf_dir, f))]
+	elf_files = []
+	if os.path.exists(elf_dir):
+		all_items = os.listdir(elf_dir)
+		elf_files = [f for f in all_items if os.path.isfile(os.path.join(elf_dir, f))]
 	generate_link_app(pwd,elf_dir,elf_files)
 	pass

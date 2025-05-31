@@ -8,8 +8,8 @@
 
 int main()
 {
-	int a = 0;
-	int b = 1;
-	assert_eq(a, b);
-	return 0;
+        int a = 0;
+        int b = 1;
+        assert_eq(a, b);
+        return 0;
 }

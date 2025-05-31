@@ -3,7 +3,7 @@
 
 void panic(char *);
 
-#define WEXITSTATUS(s) (((s)&0xff00) >> 8)
+#define WEXITSTATUS(s) (((s) & 0xff00) >> 8)
 
 #ifndef assert
 #define assert(f) \

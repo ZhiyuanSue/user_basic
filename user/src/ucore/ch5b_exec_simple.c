@@ -4,7 +4,7 @@
 
 int main()
 {
-	puts("execute hello");
-	exec("ch2b_hello_world", NULL);
-	return 0;
+        puts("execute hello");
+        exec("ch2b_hello_world", NULL);
+        return 0;
 }

@@ -133,9 +133,9 @@ int fstat(int fd, struct kstat *st)
 #else
 // Based on https://github.com/kraj/musl/blob/kraj/master/src/stat/fstat.c#L10
 #define AT_EMPTY_PATH 0x1000
-#define makedev(x, y)                                             \
-        ((((x)&0xfffff000ULL) << 32) | (((x)&0x00000fffULL) << 8) \
-         | (((y)&0xffffff00ULL) << 12) | (((y)&0x000000ffULL)))
+#define makedev(x, y)                                                 \
+        ((((x) & 0xfffff000ULL) << 32) | (((x) & 0x00000fffULL) << 8) \
+         | (((y) & 0xffffff00ULL) << 12) | (((y) & 0x000000ffULL)))
 
         struct statx stx;
         int res = syscall(SYS_statx, fd, "", AT_EMPTY_PATH, 0x77, &stx);

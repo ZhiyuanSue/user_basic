@@ -7,6 +7,6 @@ const int MAGIC = 1234;
 
 int main()
 {
-	exit(MAGIC);
-	return 0;
+        exit(MAGIC);
+        return 0;
 }

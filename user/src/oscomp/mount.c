@@ -3,7 +3,7 @@
 #include "stdlib.h"
 #include "string.h"
 
-//#define MNTPOINT "./mnt"
+// #define MNTPOINT "./mnt"
 
 static char mntpoint[64] = "./mnt";
 static char device[64] = "/dev/vda2";
