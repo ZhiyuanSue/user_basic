@@ -17,7 +17,7 @@ _num_app:\n"
 	for file in elf_file_list:
 		inc_bin_file = os.path.join(pwd,elf_dir,file)
 		manager_str += "\t.quad " + file + "_start\n" + "\t.quad " + file + "_end\n"
-		section_str += "\t.p2align 4\n\t.section .data.app\n \
+		section_str += "\t.p2align 4\n\t.section .user\n \
 \t.global " + file + "_start\n \
 \t.global " + file + "_end\n" \
 + file + "_start:\n" \
