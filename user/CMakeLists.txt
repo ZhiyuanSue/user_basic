@@ -52,9 +52,17 @@ target_include_directories(ulib PRIVATE ${ARCH_DIR})
 # Execuatble
 set(ENTRY "0x400000")
 #aux_source_directory(src SRCS)
-# aux_source_directory(src/oscomp SRCS)
-# aux_source_directory(src/ucore SRCS)
-aux_source_directory(src/test SRCS)
+#
+# Test suites:
+# - oscomp: Linux syscall-oriented small tests
+# - ucore:  uCore teaching labs style tests
+# - test:   minimal smoke tests
+#
+# Historically only `src/test` was enabled, which hides most payload tests.
+# Enable all suites by default so kernel syscall work is exercised.
+aux_source_directory(src/oscomp SRCS)
+aux_source_directory(src/ucore SRCS)
+# aux_source_directory(src/test SRCS)
 set(EXECUTABLE_OUTPUT_PATH ${ARCH})
 foreach(PATH ${SRCS})
     get_filename_component(NAME ${PATH} NAME_WE)
