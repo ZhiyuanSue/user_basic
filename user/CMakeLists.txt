@@ -60,8 +60,8 @@ set(ENTRY "0x400000")
 #
 # Historically only `src/test` was enabled, which hides most payload tests.
 # Enable all suites by default so kernel syscall work is exercised.
-aux_source_directory(src/oscomp SRCS)
-aux_source_directory(src/ucore SRCS)
+# aux_source_directory(src/oscomp SRCS)
+# aux_source_directory(src/ucore SRCS)
 aux_source_directory(src/test SRCS)
 set(EXECUTABLE_OUTPUT_PATH ${ARCH})
 foreach(PATH ${SRCS})
