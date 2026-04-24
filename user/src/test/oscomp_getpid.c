@@ -5,16 +5,25 @@
 /*
  * Curated syscall test (from oscomp): getpid
  *
- * Expected: prints "getpid success." and a non-negative pid.
+ * Expected: prints process ID and exits successfully
  */
 
 static void test_getpid(void)
 {
-        TEST_START(__func__);
+        TEST_START("getpid");
+
         int pid = getpid();
-        assert(pid >= 0);
-        printf("getpid success.\npid = %d\n", pid);
-        TEST_END(__func__);
+
+        if (pid < 0) {
+                printf("[FAIL] getpid returned negative value: %d\n", pid);
+                TEST_END("getpid");
+                exit(1);
+        }
+
+        printf("[INFO] getpid() = %d\n", pid);
+        printf("[PASS] getpid returned valid PID\n");
+
+        TEST_END("getpid");
 }
 
 int main(void)

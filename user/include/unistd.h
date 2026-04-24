@@ -31,6 +31,8 @@ int sleep(unsigned long long);
 int set_priority(int prio);
 void *mmap(void *, size_t, int, int, int, off_t);
 int munmap(void *start, size_t len);
+int mprotect(void *addr, size_t len, int prot);
+void *mremap(void *old_addr, size_t old_size, size_t new_size, int flags, ...);
 int wait(int *);
 int spawn(char *file);
 

@@ -15,6 +15,22 @@
         puts(x);                 \
         puts(" ==========\n");
 
+/* Unified test result markers */
+#define TEST_PASS(name)    \
+        puts("[PASS] ");    \
+        puts(name);         \
+        puts("\n");
+
+#define TEST_FAIL(name)    \
+        puts("[FAIL] ");    \
+        puts(name);         \
+        puts("\n");
+
+#define TEST_SKIP(name)    \
+        puts("[SKIP] ");    \
+        puts(name);         \
+        puts("\n");
+
 #define stdin  STDIN
 #define stdout STDOUT
 #define stderr STDERR

@@ -3,10 +3,10 @@
 
 const int MAGIC = 1234;
 
-/// 正确输出： 不输出 FAIL，以 1234 退出
+/// Test exit syscall with specific exit code
+/// Expected: exits with code 1234, no output needed
 
 int main()
 {
         exit(MAGIC);
-        return 0;
 }

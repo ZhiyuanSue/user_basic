@@ -33,6 +33,11 @@ pid_t getpid(void)
         return syscall(SYS_getpid);
 }
 
+pid_t gettid(void)
+{
+        return syscall(SYS_gettid);
+}
+
 pid_t getppid(void)
 {
         return syscall(SYS_getppid);
@@ -65,6 +70,11 @@ void exit(int code)
 int waitpid(int pid, int *code, int options)
 {
         return syscall(SYS_wait4, pid, code, options, 0);
+}
+
+pid_t wait4(pid_t pid, int *status, int options, void *rusage)
+{
+        return syscall(SYS_wait4, pid, status, options, rusage);
 }
 
 int exec(char *name)
@@ -119,6 +129,17 @@ void *mmap(void *start, size_t len, int prot, int flags, int fd, off_t off)
 int munmap(void *start, size_t len)
 {
         return syscall(SYS_munmap, start, len);
+}
+
+int mprotect(void *addr, size_t len, int prot)
+{
+        return syscall(SYS_mprotect, addr, len, prot);
+}
+
+void *mremap(void *old_addr, size_t old_size, size_t new_size, int flags, ...)
+{
+        /* For simplicity, we don't support the new_address parameter yet */
+        return syscall(SYS_mremap, old_addr, old_size, new_size, flags, 0);
 }
 
 int wait(int *code)
