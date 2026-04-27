@@ -1,5 +1,6 @@
 #include <stddef.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include "syscall.h"
 
@@ -50,7 +51,7 @@ int sched_yield(void)
 
 pid_t fork(void)
 {
-        return syscall(SYS_clone, SIGCHLD, 0);
+        return syscall(SYS_fork);
 }
 
 pid_t clone(int (*fn)(void *arg), void *arg, void *stack, size_t stack_size,
@@ -69,12 +70,22 @@ void exit(int code)
 
 int waitpid(int pid, int *code, int options)
 {
-        return syscall(SYS_wait4, pid, code, options, 0);
+        long ret = syscall(SYS_wait4, pid, code, options, 0);
+        if (ret < 0) {
+                errno = -ret;
+                return -1;
+        }
+        return ret;
 }
 
 pid_t wait4(pid_t pid, int *status, int options, void *rusage)
 {
-        return syscall(SYS_wait4, pid, status, options, rusage);
+        long ret = syscall(SYS_wait4, pid, status, options, rusage);
+        if (ret < 0) {
+                errno = -ret;
+                return -1;
+        }
+        return ret;
 }
 
 int exec(char *name)
@@ -139,7 +150,12 @@ int mprotect(void *addr, size_t len, int prot)
 void *mremap(void *old_addr, size_t old_size, size_t new_size, int flags, ...)
 {
         /* For simplicity, we don't support the new_address parameter yet */
-        return syscall(SYS_mremap, old_addr, old_size, new_size, flags, 0);
+        long ret = syscall(SYS_mremap, old_addr, old_size, new_size, flags, 0);
+        if (ret < 0) {
+                errno = -ret;
+                return (void *)-1;
+        }
+        return (void *)ret;
 }
 
 int wait(int *code)

@@ -35,6 +35,7 @@ int mprotect(void *addr, size_t len, int prot);
 void *mremap(void *old_addr, size_t old_size, size_t new_size, int flags, ...);
 int wait(int *);
 int spawn(char *file);
+pid_t wait4(pid_t pid, int *status, int options, void *rusage);
 
 int fstat(int fd, struct kstat *st);
 int sys_linkat(int olddirfd, char *oldpath, int newdirfd, char *newpath,
