@@ -52,10 +52,9 @@ target_include_directories(ulib PRIVATE ${ARCH_DIR})
 # Execuatble
 set(ENTRY "0x400000")
 
-# Test suites - only compile test/ directory
+# Test suites - compile test/ and oscomp/ directories
 aux_source_directory(src/test SRCS)
-# Note: oscomp/ and ucore/ tests are kept but not compiled
-# aux_source_directory(src/oscomp SRCS)
+aux_source_directory(src/oscomp SRCS)
 
 set(EXECUTABLE_OUTPUT_PATH ${ARCH})
 
