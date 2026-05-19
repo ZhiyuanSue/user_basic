@@ -28,8 +28,15 @@
 /* Type for signal handler */
 typedef void (*sig_t)(int);
 
+/* Signal constants */
+#define SIG_DFL  ((sig_t)0)   /* Default signal handling */
+#define SIG_IGN  ((sig_t)1)   /* Ignore signal */
+#define SIG_ERR  ((sig_t)-1)  /* Error return */
+
 /* Function declarations */
 sig_t signal(int sig, sig_t func);
+int kill(pid_t pid, int sig);
+int raise(int sig);
 
 /* Setjmp/longjmp for signal handling */
 #include <setjmp.h>
