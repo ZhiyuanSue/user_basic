@@ -10,10 +10,16 @@
 void test_dup()
 {
         TEST_START(__func__);
+
         int fd = dup(STDOUT);
-        assert(fd >= 0);
+        if (fd < 0) {
+                printf("ERROR: dup syscall not implemented or failed (returned %d)\n", fd);
+                TEST_FAIL(__func__);
+                return;
+        }
+
         printf("  new fd is %d.\n", fd);
-        TEST_END(__func__);
+        TEST_PASS(__func__);
 }
 
 int main(void)

@@ -3,19 +3,9 @@
 #include <unistd.h>
 #include <string.h>
 
-/*
- * Phase 2B: Signal Delivery Test
- *
- * This test verifies that:
- * 1. We can set up signal handlers via rt_sigaction
- * 2. We can send signals to ourselves via kill
- * 3. Signal handlers are actually called (delivery mechanism works)
- */
+#include "../../include/uapi_sigaction.h"
+#include "../../lib/syscall_ids.h"
 
-/* Include architecture-specific syscall numbers from user payload lib */
-#include "../lib/syscall_ids.h"
-
-/* Standard signal definitions (from Linux signal.h) */
 #define SIGHUP		1
 #define SIGINT		2
 #define SIGQUIT		3
@@ -35,203 +25,231 @@
 #define SIGCONT		18
 #define SIGSTOP		19
 
-/* Global test counters */
 static volatile int signal_handler_called = 0;
 static volatile int received_signal = 0;
 
-/* Signal handler function */
-void my_signal_handler(int sig)
+/* File-scope act: avoid deep-stack &act landing below the 8-page user stack. */
+static linux_uapi_sigaction_t sig_delivery_act;
+
+static size_t my_strlen(const char *s)
 {
-    signal_handler_called = 1;
-    received_signal = sig;
-    /* Write syscall for output - multi-architecture support */
+        size_t n = 0;
+        while (s[n] != '\0') {
+                n++;
+        }
+        return n;
+}
+
+__attribute__((noreturn)) void my_signal_handler(int sig)
+{
+        signal_handler_called = 1;
+        received_signal = sig;
 #if defined(__x86_64__)
-    __asm__ volatile (
-        "mov $1, %%rax\n\t"   /* SYS_write */
-        "mov $1, %%rdi\n\t"   /* stdout */
-        "syscall"
-        : : "S"("[SIGNAL HANDLER] Received signal"), "d"(sig)
-        : "rax", "rdi", "rcx", "r11", "memory"
-    );
+        {
+                static const char msg[] = "[SIGNAL HANDLER] Received signal\n";
+                size_t len = my_strlen(msg);
+                (void)sig;
+                __asm__ volatile(
+                        "mov $1, %%rax\n\t"
+                        "mov $1, %%rdi\n\t"
+                        "mov %[buf], %%rsi\n\t"
+                        "mov %[len], %%rdx\n\t"
+                        "syscall"
+                        : : [buf] "r"(msg), [len] "r"(len)
+                        : "rax", "rdi", "rsi", "rdx", "rcx", "r11", "memory");
+                /* rt_sigreturn — must not fall through to compiler "ret". */
+                __asm__ volatile(
+                        "mov %[nr], %%rax\n\t"
+                        "syscall\n\t"
+                        "1: jmp 1b"
+                        :
+                        : [nr] "i"(SYS_rt_sigreturn)
+                        : "rax", "rcx", "r11", "memory");
+        }
 #elif defined(__aarch64__)
-    register long x8 asm("x8") = 64;   /* SYS_write for aarch64 */
-    register long x0 asm("x0") = 1;    /* stdout */
-    register const char *x1 asm("x1") = "[SIGNAL HANDLER] Received signal";
-    register long x2 asm("x2") = sig;
-    __asm__ volatile (
-        "svc #0"
-        : : "r"(x8), "r"(x0), "r"(x1), "r"(x2)
-        : "memory"
-    );
+        {
+                static const char msg[] = "[SIGNAL HANDLER] Received signal\n";
+                size_t len = my_strlen(msg);
+                register long x8 asm("x8") = 64;
+                register long x0 asm("x0") = 1;
+                register const char *x1 asm("x1") = msg;
+                register long x2 asm("x2") = (long)len;
+                (void)sig;
+                __asm__ volatile("svc #0"
+                                 : : "r"(x8), "r"(x0), "r"(x1), "r"(x2)
+                                 : "memory");
+                __asm__ volatile(
+                        "mov x8, %[nr]\n\t"
+                        "svc #0\n\t"
+                        "1: b 1b"
+                        :
+                        : [nr] "i"(SYS_rt_sigreturn)
+                        : "x8", "x0", "memory");
+        }
 #else
 #error "Unsupported architecture"
 #endif
+        __builtin_unreachable();
 }
 
-/* Syscall wrappers */
 static long my_rt_sigaction(int sig, void (*handler)(int))
 {
-    struct {
-        unsigned long sig[64 / (8 * sizeof(unsigned long))];
-    } mask = {0}; /* Initialize to zero */
+        long result;
 
-    long result;
+        sig_delivery_act.sa_handler = handler;
+        sig_delivery_act.sa_flags = 0;
+        sig_delivery_act.sa_restorer = NULL;
+        sig_delivery_act.sa_mask[0] = 0;
 
-    #ifdef __x86_64__
-    size_t sigsetsize = sizeof(mask);
-    __asm__ volatile (
-        "mov %[syscall], %%rax\n\t"
-        "mov %[size], %%r10\n\t"
-        "syscall"
-        : "=a"(result)
-        : [syscall] "i"(SYS_rt_sigaction), "D"(sig), "S"(handler),
-          "d"(0), [size] "r"(sigsetsize)
-        : "rcx", "r11", "r10", "memory"
-    );
-    #elif defined(__aarch64__)
-    /* AArch64 uses different registers for syscall parameters */
-    __asm__ volatile (
-        "mov x8, %[syscall]\n\t"
-        "svc #0"
-        : "=r"(result)
-        : [syscall] "i"(SYS_rt_sigaction), "r"(sig), "r"(handler),
-          "r"(0), "r"(0)
-        : "x0", "x1", "x2", "x3", "x4", "x8", "memory"
-    );
-    #else
-    result = -1; /* Not implemented */
-    #endif
+#ifdef __x86_64__
+        __asm__ volatile(
+                "mov %[syscall], %%rax\n\t"
+                "mov %[size], %%r10\n\t"
+                "syscall"
+                : "=a"(result)
+                : [syscall] "i"(SYS_rt_sigaction), "D"(sig),
+                  "S"(&sig_delivery_act), "d"(0),
+                  [size] "i"(LINUX_UAPI_SIGSET_SIZE)
+                : "rcx", "r11", "r10", "memory");
+#elif defined(__aarch64__)
+        register long x8 asm("x8") = SYS_rt_sigaction;
+        register long x0 asm("x0") = sig;
+        register void *x1 asm("x1") = &sig_delivery_act;
+        register long x2 asm("x2") = 0;
+        register long x3 asm("x3") = LINUX_UAPI_SIGSET_SIZE;
+        __asm__ volatile("svc #0"
+                         : "+r"(x0)
+                         : "r"(x8), "r"(x1), "r"(x2), "r"(x3)
+                         : "memory");
+        result = x0;
+#else
+        result = -1;
+#endif
 
-    return result;
+        return result;
 }
 
 static long my_kill(pid_t pid, int sig)
 {
-    long result;
+        long result;
 
-    #ifdef __x86_64__
-    __asm__ volatile (
-        "mov %[syscall], %%rax\n\t"
-        "syscall"
-        : "=a"(result)
-        : [syscall] "i"(SYS_kill), "D"((long)pid), "S"((long)sig)
-        : "rcx", "r11", "memory"
-    );
-    #elif defined(__aarch64__)
-    __asm__ volatile (
-        "mov x8, %[syscall]\n\t"
-        "svc #0"
-        : "=r"(result)
-        : [syscall] "i"(SYS_kill), "r"((long)pid), "r"((long)sig)
-        : "x0", "x1", "x8", "memory"
-    );
-    #else
-    result = -1; /* Not implemented */
-    #endif
+#ifdef __x86_64__
+        __asm__ volatile(
+                "mov %[syscall], %%rax\n\t"
+                "syscall"
+                : "=a"(result)
+                : [syscall] "i"(SYS_kill), "D"((long)pid), "S"((long)sig)
+                : "rcx", "r11", "memory");
+#elif defined(__aarch64__)
+        __asm__ volatile(
+                "mov x8, %[syscall]\n\t"
+                "svc #0"
+                : "=r"(result)
+                : [syscall] "i"(SYS_kill), "r"((long)pid), "r"((long)sig)
+                : "x0", "x1", "x8", "memory");
+#else
+        result = -1;
+#endif
 
-    return result;
+        return result;
 }
 
-/* Helper function for write syscall - multi-architecture */
 static void my_write(const char *str)
 {
+        size_t len = my_strlen(str);
+
 #if defined(__x86_64__)
-    __asm__ volatile (
-        "mov $1, %%rax\n\t"
-        "mov $1, %%rdi\n\t"
-        "syscall"
-        : : "S"(str)
-        : "rax", "rdi", "rcx", "r11", "memory"
-    );
+        __asm__ volatile(
+                "mov $1, %%rax\n\t"
+                "mov $1, %%rdi\n\t"
+                "mov %[buf], %%rsi\n\t"
+                "mov %[len], %%rdx\n\t"
+                "syscall"
+                : : [buf] "r"(str), [len] "r"(len)
+                : "rax", "rdi", "rsi", "rdx", "rcx", "r11", "memory");
 #elif defined(__aarch64__)
-    register long x8 asm("x8") = 64;   /* SYS_write */
-    register long x0 asm("x0") = 1;    /* stdout */
-    register const char *x1 asm("x1") = str;
-    __asm__ volatile (
-        "svc #0"
-        : : "r"(x8), "r"(x0), "r"(x1)
-        : "memory"
-    );
+        register long x8 asm("x8") = 64;
+        register long x0 asm("x0") = 1;
+        register const char *x1 asm("x1") = str;
+        register long x2 asm("x2") = (long)len;
+        __asm__ volatile("svc #0"
+                         :
+                         : "r"(x8), "r"(x0), "r"(x1), "r"(x2)
+                         : "memory");
 #endif
 }
 
 int test_signal_delivery(void)
 {
-    /* Write syscall for output - multi-architecture support */
-    my_write("=== Test: Signal Delivery ===\n");
+        my_write("=== Test: Signal Delivery ===\n");
+        my_write("Setting up signal handler for SIGUSR1...\n");
 
-    /* Set up signal handler */
-    my_write("Setting up signal handler for SIGUSR1...\n");
-
-    long sig_result = my_rt_sigaction(SIGUSR1, my_signal_handler);
-    if (sig_result != 0) {
-        my_write("FAIL: Could not set signal handler\n");
-        return 1;
-    }
-
-    my_write("Signal handler installed successfully\n");
-
-    /* Get PID */
-    pid_t my_pid = getpid();
-    char pid_str[20];
-    int pid_len = 0;
-    int temp = my_pid;
-    if (temp == 0) {
-        pid_str[pid_len++] = '0';
-    } else {
-        char buf[20];
-        int buf_len = 0;
-        while (temp > 0) {
-            buf[buf_len++] = '0' + (temp % 10);
-            temp /= 10;
+        long sig_result = my_rt_sigaction(SIGUSR1, my_signal_handler);
+        if (sig_result != 0) {
+                printf("FAIL: rt_sigaction returned %d\n", (int)sig_result);
+                return 1;
         }
-        while (buf_len > 0) {
-            pid_str[pid_len++] = buf[--buf_len];
+
+        my_write("Signal handler installed successfully\n");
+
+        pid_t my_pid = getpid();
+        char pid_str[20];
+        int pid_len = 0;
+        int temp = my_pid;
+        if (temp == 0) {
+                pid_str[pid_len++] = '0';
+        } else {
+                char buf[20];
+                int buf_len = 0;
+                while (temp > 0) {
+                        buf[buf_len++] = '0' + (temp % 10);
+                        temp /= 10;
+                }
+                while (buf_len > 0) {
+                        pid_str[pid_len++] = buf[--buf_len];
+                }
         }
-    }
-    pid_str[pid_len] = '\n';
+        pid_str[pid_len] = '\n';
 
-    /* Send signal to ourselves */
-    my_write("Sending SIGUSR1 to PID: ");
-    my_write(pid_str);
+        my_write("Sending SIGUSR1 to PID: ");
+        my_write(pid_str);
 
-    long kill_result = my_kill(my_pid, SIGUSR1);
-    if (kill_result != 0) {
-        my_write("FAIL: kill() returned error\n");
-        return 1;
-    }
+        long kill_result = my_kill(my_pid, SIGUSR1);
+        if (kill_result != 0) {
+                printf("FAIL: kill() returned %d\n", (int)kill_result);
+                return 1;
+        }
 
-    my_write("kill() returned success\n");
+        my_write("kill() returned success\n");
 
-    /* Check if signal handler was called */
-    if (signal_handler_called) {
-        my_write("PASS: Signal handler was called!\n");
-        return 0;
-    } else {
+        if (signal_handler_called) {
+                my_write("PASS: Signal handler was called!\n");
+                return 0;
+        }
+
         my_write("FAIL: Signal handler was NOT called\n");
         return 1;
-    }
 }
 
 int main(void)
 {
-    printf("╔══════════════════════════════════════════════════════════════╗\n");
-    printf("║     Phase 2B: Signal Delivery Test                            ║\n");
-    printf("╚══════════════════════════════════════════════════════════════╝\n\n");
+        printf("╔══════════════════════════════════════════════════════════════╗\n");
+        printf("║     Phase 2B: Signal Delivery Test                            ║\n");
+        printf("╚══════════════════════════════════════════════════════════════╝\n\n");
 
-    int test_result = test_signal_delivery();
+        int test_result = test_signal_delivery();
 
-    printf("\n╔══════════════════════════════════════════════════════════════╗\n");
-    printf("║                      Test Result                             ║\n");
-    printf("╠══════════════════════════════════════════════════════════════╣\n");
+        printf("\n╔══════════════════════════════════════════════════════════════╗\n");
+        printf("║                      Test Result                             ║\n");
+        printf("╠══════════════════════════════════════════════════════════════╣\n");
 
-    if (test_result == 0) {
-        printf("║  ✅ PASSED: Signal delivery mechanism works!                ║\n");
-    } else {
-        printf("║  ❌ FAILED: Signal delivery mechanism not working          ║\n");
-    }
+        if (test_result == 0) {
+                printf("║  ✅ PASSED: Signal delivery mechanism works!                ║\n");
+        } else {
+                printf("║  ❌ FAILED: Signal delivery mechanism not working          ║\n");
+        }
 
-    printf("╚══════════════════════════════════════════════════════════════╝\n");
+        printf("╚══════════════════════════════════════════════════════════════╝\n");
 
-    return test_result;
+        return test_result;
 }

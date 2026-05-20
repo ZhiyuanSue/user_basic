@@ -13,17 +13,34 @@
 void test_close(void)
 {
         TEST_START(__func__);
+
         int fd = open("test_close.txt", O_CREATE | O_RDWR);
-        // assert(fd > 0);
+        if (fd < 0) {
+                printf("ERROR: open syscall not implemented or failed (returned %d)\n", fd);
+                TEST_FAIL(__func__);
+                return;
+        }
+
         const char *str = "  close error.\n";
         int str_len = strlen(str);
-        // assert(write(fd, str, str_len) == str_len);
-        write(fd, str, str_len);
-        int rt = close(fd);
-        assert(rt == 0);
-        printf("  close %d success.\n", fd);
 
-        TEST_END(__func__);
+        int written = write(fd, str, str_len);
+        if (written < 0) {
+                printf("ERROR: write syscall failed (returned %d)\n", written);
+                close(fd);
+                TEST_FAIL(__func__);
+                return;
+        }
+
+        int rt = close(fd);
+        if (rt != 0) {
+                printf("ERROR: close syscall failed (returned %d)\n", rt);
+                TEST_FAIL(__func__);
+                return;
+        }
+
+        printf("  close %d success.\n", fd);
+        TEST_PASS(__func__);
 }
 
 int main(void)

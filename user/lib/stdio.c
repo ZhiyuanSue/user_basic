@@ -71,7 +71,7 @@ static void printptr(uint64 x)
         out(stdout, buf, i);
 }
 
-// Print to the console. only understands %d, %x, %p, %s.
+// Print to the console. understands %d, %ld, %x, %p, %s.
 void printf(const char *fmt, ...)
 {
         va_list ap;
@@ -94,6 +94,15 @@ void printf(const char *fmt, ...)
                 if (s[1] == 0)
                         break;
                 switch (s[1]) {
+                case 'l':
+                        if (s[2] == 'd') {
+                                printint((int)va_arg(ap, long), 10, 1);
+                                s++;
+                                break;
+                        }
+                        putchar('%');
+                        putchar('l');
+                        break;
                 case 'd':
                         printint(va_arg(ap, int), 10, 1);
                         break;

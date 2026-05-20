@@ -5,14 +5,28 @@
 void test_read()
 {
         TEST_START(__func__);
+
         int fd = open("./text.txt", 0);
+        if (fd < 0) {
+                printf("ERROR: open syscall not implemented or failed (returned %d)\n", fd);
+                TEST_FAIL(__func__);
+                return;
+        }
+
         char buf[256];
         int size = read(fd, buf, 256);
-        assert(size >= 0);
+        if (size < 0) {
+                printf("ERROR: read syscall not implemented or failed (returned %d)\n", size);
+                close(fd);
+                TEST_FAIL(__func__);
+                return;
+        }
 
+        printf("Successfully read %d bytes\n", size);
         write(STDOUT, buf, size);
         close(fd);
-        TEST_END(__func__);
+
+        TEST_PASS(__func__);
 }
 
 int main(void)

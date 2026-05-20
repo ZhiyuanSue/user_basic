@@ -15,16 +15,24 @@ void test_mount()
 
         printf("Mounting dev:%s to %s\n", device, mntpoint);
         int ret = mount(device, mntpoint, fs_type, 0, NULL);
-        printf("mount return: %d\n", ret);
-        assert(ret == 0);
-
-        if (ret == 0) {
-                printf("mount successfully\n");
-                ret = umount(mntpoint);
-                printf("umount return: %d\n", ret);
+        if (ret < 0) {
+                printf("ERROR: mount syscall not implemented or failed (returned %d)\n", ret);
+                TEST_FAIL(__func__);
+                return;
         }
 
-        TEST_END(__func__);
+        printf("mount return: %d\n", ret);
+        printf("mount successfully\n");
+
+        ret = umount(mntpoint);
+        if (ret < 0) {
+                printf("ERROR: umount syscall failed (returned %d)\n", ret);
+                TEST_FAIL(__func__);
+                return;
+        }
+
+        printf("umount return: %d\n", ret);
+        TEST_PASS(__func__);
 }
 
 int main(int argc, char *argv[])

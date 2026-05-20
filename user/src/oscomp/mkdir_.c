@@ -5,18 +5,29 @@
 void test_mkdir(void)
 {
         TEST_START(__func__);
+
         int rt, fd;
 
         rt = mkdir("test_mkdir", 0666);
+        if (rt < 0) {
+                printf("ERROR: mkdir syscall not implemented or failed (returned %d)\n", rt);
+                TEST_FAIL(__func__);
+                return;
+        }
+
         printf("mkdir ret: %d\n", rt);
-        assert(rt != -1);
+
         fd = open("test_mkdir", O_RDONLY | O_DIRECTORY);
-        if (fd > 0) {
-                printf("  mkdir success.\n");
-                close(fd);
-        } else
-                printf("  mkdir error.\n");
-        TEST_END(__func__);
+        if (fd < 0) {
+                printf("ERROR: open syscall failed for created directory (returned %d)\n", fd);
+                TEST_FAIL(__func__);
+                return;
+        }
+
+        printf("  mkdir success.\n");
+        close(fd);
+
+        TEST_PASS(__func__);
 }
 
 int main(void)

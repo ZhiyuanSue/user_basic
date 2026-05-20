@@ -12,8 +12,8 @@
  * 3. 信号数据结构验证
  */
 
-/* Include architecture-specific syscall numbers from user payload lib */
-#include "../lib/syscall_ids.h"
+#include "../../include/uapi_sigaction.h"
+#include "../../lib/syscall_ids.h"
 
 /* Signal numbers if not defined */
 #ifndef SIGUSR1
@@ -32,14 +32,6 @@
 typedef struct {
     unsigned long sig[64 / (8 * sizeof(unsigned long))];
 } sigset_t;
-
-/* sigaction_t - 信号处理结构 */
-typedef struct {
-    void (*handler)(int);    /* 信号处理函数 */
-    sigset_t mask;           /* 执行期间要阻塞的信号 */
-    int flags;               /* SA_* 标志 */
-    void (*restorer)(void);  /* 恢复函数 (obsolete) */
-} sigaction_t;
 
 /* Signal handler constants */
 #define SIG_DFL ((void (*)(int))0)   /* 默认处理 */
@@ -84,27 +76,17 @@ int test_rt_sigaction(void)
 {
     printf("=== Test 1: rt_sigaction - signal handler management ===\n");
 
-    struct sigaction {
-        void (*handler)(int);
-        sigset_t mask;
-        int flags;
-        void (*restorer)(void);
-    };
-
-    struct sigaction new_act, old_act;
+    linux_uapi_sigaction_t new_act, old_act;
     memset(&new_act, 0, sizeof(new_act));
     memset(&old_act, 0, sizeof(old_act));
 
-    /* 设置新的信号处理函数 */
-    new_act.handler = SIG_IGN; /* 忽略信号 */
-    sigemptyset(&new_act.mask);
-    new_act.flags = 0;
-    new_act.restorer = NULL;
+    new_act.sa_handler = (void (*)(int))SIG_IGN;
+    new_act.sa_flags = 0;
+    new_act.sa_restorer = NULL;
+    new_act.sa_mask[0] = 0;
 
     long result;
-    size_t sigsetsize_value = sizeof(sigset_t);
 
-    /* 使用架构相关的syscall号码 */
     #ifdef __x86_64__
     __asm__ volatile (
         "mov %[syscall], %%rax\n\t"
@@ -112,50 +94,31 @@ int test_rt_sigaction(void)
         "syscall"
         : "=a"(result)
         : [syscall] "i"(SYS_rt_sigaction), "D"(SIGUSR1), "S"(&new_act),
-          "d"(&old_act), [size] "r"(sigsetsize_value)
+          "d"(&old_act), [size] "i"(LINUX_UAPI_SIGSET_SIZE)
         : "rcx", "r11", "r10", "memory"
     );
     #elif defined(__aarch64__)
-    __asm__ volatile (
-        "mov x8, %6\n\t"
-        "mov x0, %1\n\t"
-        "mov x1, %2\n\t"
-        "mov x2, %3\n\t"
-        "mov x3, %4\n\t"
-        "mov x4, %5\n\t"
-        "svc #0\n\t"
-        "mov %0, x0"
-        : "=r"(result)
-        : "r"(SIGUSR1), "r"(&new_act), "r"(&old_act),
-          "r"(sizeof(sigset_t)), "r"(0), "i"(SYS_rt_sigaction)
-        : "x8", "x0", "x1", "x2", "x3", "x4", "memory"
-    );
-    #elif defined(__aarch64__)
-    __asm__ volatile (
-        "mov x8, %6\n\t"
-        "mov x0, %1\n\t"
-        "mov x1, %2\n\t"
-        "mov x2, %3\n\t"
-        "mov x3, %4\n\t"
-        "mov x4, %5\n\t"
-        "svc #0\n\t"
-        "mov %0, x0"
-        : "=r"(result)
-        : "r"(SIGUSR1), "r"(&new_act), "r"(&old_act),
-          "r"(sizeof(sigset_t)), "r"(0), "i"(SYS_rt_sigaction)
-        : "x8", "x0", "x1", "x2", "x3", "x4", "memory"
-    );
+    register long x8 asm("x8") = SYS_rt_sigaction;
+    register long x0 asm("x0") = SIGUSR1;
+    register void *x1 asm("x1") = &new_act;
+    register void *x2 asm("x2") = &old_act;
+    register long x3 asm("x3") = LINUX_UAPI_SIGSET_SIZE;
+    __asm__ volatile("svc #0"
+                     : "+r"(x0)
+                     : "r"(x8), "r"(x1), "r"(x2), "r"(x3)
+                     : "memory");
+    result = x0;
     #else
     #error "Unsupported architecture for rt_sigaction test"
     #endif
 
-    printf("rt_sigaction(SIGUSR1, SIG_IGN) returned %ld\n", result);
+    printf("rt_sigaction(SIGUSR1, SIG_IGN) returned %d\n", (int)result);
 
     if (result == 0) {
-        printf("New handler set: %p\n", new_act.handler);
-        printf("Old handler retrieved: %p\n", old_act.handler);
+        printf("New handler set: %p\n", new_act.sa_handler);
+        printf("Old handler retrieved: %p\n", old_act.sa_handler);
 
-        if (old_act.handler == SIG_DFL) {
+        if (old_act.sa_handler == SIG_DFL) {
             printf("PASS: rt_sigaction successfully changed handler from SIG_DFL to SIG_IGN\n");
             sigaction_test_passed = 1;
             return 0;
@@ -165,7 +128,7 @@ int test_rt_sigaction(void)
             return 0;
         }
     } else {
-        printf("FAIL: rt_sigaction failed with error %ld\n", result);
+        printf("FAIL: rt_sigaction failed with error %d\n", (int)result);
         return 1;
     }
 }
@@ -217,7 +180,7 @@ int test_rt_sigprocmask(void)
     #error "Unsupported architecture for rt_sigprocmask test"
     #endif
 
-    printf("rt_sigprocmask(SIG_BLOCK, SIGUSR1) returned %ld\n", result);
+    printf("rt_sigprocmask(SIG_BLOCK, SIGUSR1) returned %d\n", (int)result);
 
     if (result == 0) {
         printf("New mask: SIGUSR1 %s\n", sigismember(&new_mask, SIGUSR1) ? "set" : "not set");
@@ -264,7 +227,7 @@ int test_rt_sigprocmask(void)
             return 0;
         }
     } else {
-        printf("FAIL: rt_sigprocmask failed with error %ld\n", result);
+        printf("FAIL: rt_sigprocmask failed with error %d\n", (int)result);
         return 1;
     }
 }
@@ -329,10 +292,10 @@ int main(void)
     printf("╔══════════════════════════════════════════════════════════════╗\n");
     printf("║                      Test Summary                           ║\n");
     printf("╠══════════════════════════════════════════════════════════════╣\n");
-    printf("║  Total Tests:  %2d                                            ║\n", total_tests);
-    printf("║  Passed:       %2d                                            ║\n", passed_tests);
-    printf("║  Failed:       %2d                                            ║\n", total_tests - passed_tests);
-    printf("║  Success Rate: %2d%%                                           ║\n",
+    printf("║  Total Tests:  %d                                             ║\n", total_tests);
+    printf("║  Passed:       %d                                             ║\n", passed_tests);
+    printf("║  Failed:       %d                                             ║\n", total_tests - passed_tests);
+    printf("║  Success Rate: %d%%                                            ║\n",
            (passed_tests * 100) / total_tests);
     printf("╚══════════════════════════════════════════════════════════════╝\n");
 

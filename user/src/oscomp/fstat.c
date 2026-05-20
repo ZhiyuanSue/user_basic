@@ -10,11 +10,23 @@ static struct kstat kst;
 void test_fstat()
 {
         TEST_START(__func__);
-        int fd = open("./text.txt", 0);
-        int ret = fstat(fd, &kst);
-        printf("fstat ret: %d\n", ret);
-        assert(ret >= 0);
 
+        int fd = open("./text.txt", 0);
+        if (fd < 0) {
+                printf("ERROR: open syscall not implemented or failed (returned %d)\n", fd);
+                TEST_FAIL(__func__);
+                return;
+        }
+
+        int ret = fstat(fd, &kst);
+        if (ret < 0) {
+                printf("ERROR: fstat syscall not implemented or failed (returned %d)\n", ret);
+                close(fd);
+                TEST_FAIL(__func__);
+                return;
+        }
+
+        printf("fstat ret: %d\n", ret);
         printf("fstat: dev: %d, inode: %d, mode: %d, nlink: %d, size: %d, atime: %d, mtime: %d, ctime: %d\n",
                kst.st_dev,
                kst.st_ino,
@@ -25,7 +37,8 @@ void test_fstat()
                kst.st_mtime_sec,
                kst.st_ctime_sec);
 
-        TEST_END(__func__);
+        close(fd);
+        TEST_PASS(__func__);
 }
 
 int main(void)

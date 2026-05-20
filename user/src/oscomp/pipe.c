@@ -11,13 +11,21 @@ static int fd[2];
 void test_pipe(void)
 {
         TEST_START(__func__);
+
+        int ret = pipe(fd);
+        if (ret < 0) {
+                printf("ERROR: pipe syscall not implemented or failed (returned %d)\n", ret);
+                TEST_FAIL(__func__);
+                return;
+        }
+
         int cpid;
         char buf[128] = {0};
-        int ret = pipe(fd);
-        assert(ret != -1);
         const char *data = "  Write to pipe successfully.\n";
+
         cpid = fork();
         printf("cpid: %d\n", cpid);
+
         if (cpid > 0) {
                 close(fd[1]);
                 while (read(fd[0], buf, 1) > 0)
@@ -31,7 +39,8 @@ void test_pipe(void)
                 close(fd[1]);
                 exit(0);
         }
-        TEST_END(__func__);
+
+        TEST_PASS(__func__);
 }
 
 int main(void)

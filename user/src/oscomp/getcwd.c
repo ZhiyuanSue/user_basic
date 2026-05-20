@@ -12,14 +12,18 @@
 void test_getcwd(void)
 {
         TEST_START(__func__);
-        char *cwd = NULL;
+
         char buf[128] = {0};
-        cwd = getcwd(buf, 128);
-        if (cwd != NULL)
-                printf("getcwd: %s successfully!\n", buf);
-        else
-                printf("getcwd ERROR.\n");
-        TEST_END(__func__);
+        char *cwd = getcwd(buf, 128);
+
+        if (cwd == NULL) {
+                printf("ERROR: getcwd syscall not implemented or failed\n");
+                TEST_FAIL(__func__);
+                return;
+        }
+
+        printf("getcwd: %s successfully!\n", buf);
+        TEST_PASS(__func__);
 }
 
 int main(void)

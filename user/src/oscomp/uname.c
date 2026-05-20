@@ -17,8 +17,13 @@ struct utsname un;
 void test_uname()
 {
         TEST_START(__func__);
+
         int test_ret = uname(&un);
-        assert(test_ret >= 0);
+        if (test_ret < 0) {
+                printf("ERROR: uname syscall not implemented or failed (returned %d)\n", test_ret);
+                TEST_FAIL(__func__);
+                return;
+        }
 
         printf("Uname: %s %s %s %s %s %s\n",
                un.sysname,
@@ -28,7 +33,7 @@ void test_uname()
                un.machine,
                un.domainname);
 
-        TEST_END(__func__);
+        TEST_PASS(__func__);
 }
 
 int main(void)
