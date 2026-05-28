@@ -4,29 +4,40 @@
 
 #include "syscall.h"
 
+static long syscall_negerrno(long ret)
+{
+        if (ret < 0 && ret > -4096) {
+                errno = (int)(-ret);
+                return -1;
+        }
+        return ret;
+}
+
 int open(const char *path, int flags)
 {
-        return syscall(SYS_openat, AT_FDCWD, path, flags, O_RDWR);
+        return (int)syscall_negerrno(
+                syscall(SYS_openat, AT_FDCWD, path, flags, O_RDWR));
 }
 
 int openat(int dirfd, const char *path, int flags)
 {
-        return syscall(SYS_openat, dirfd, path, flags, 0600);
+        return (int)syscall_negerrno(
+                syscall(SYS_openat, dirfd, path, flags, 0600));
 }
 
 int close(int fd)
 {
-        return syscall(SYS_close, fd);
+        return (int)syscall_negerrno(syscall(SYS_close, fd));
 }
 
 ssize_t read(int fd, void *buf, size_t len)
 {
-        return syscall(SYS_read, fd, buf, len);
+        return (ssize_t)syscall_negerrno(syscall(SYS_read, fd, buf, len));
 }
 
 ssize_t write(int fd, const void *buf, size_t len)
 {
-        return syscall(SYS_write, fd, buf, len);
+        return (ssize_t)syscall_negerrno(syscall(SYS_write, fd, buf, len));
 }
 
 pid_t getpid(void)
