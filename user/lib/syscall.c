@@ -63,10 +63,10 @@ int sched_yield(void)
 pid_t fork(void)
 {
 #ifdef __aarch64__
-        /* Clone not implemented yet on aarch64 */
-        errno = ENOSYS;
-        return -1;
+        /* aarch64: fork is implemented as clone(flags=0, SIGCHLD) */
+        return syscall(SYS_clone, 0, (void*)0, (void*)0, (void*)0, (void*)0);
 #else
+        /* x86_64: has separate fork syscall */
         return syscall(SYS_fork);
 #endif
 }
