@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include "../../lib/syscall_ids.h"
+
 /* Wait4 options */
 #ifndef WNOHANG
 #define WNOHANG    0x00000001  /* Don't block if no child exited */
@@ -21,6 +23,136 @@
 #ifndef WEXITSTATUS
 #define WEXITSTATUS(status) (((status) & 0xff00) >> 8)
 #endif
+
+static size_t my_strlen(const char *s)
+{
+        size_t n = 0;
+
+        while (s[n] != '\0') {
+                n++;
+        }
+        return n;
+}
+
+static void my_write(const char *str)
+{
+        size_t len = my_strlen(str);
+
+#if defined(__x86_64__)
+        __asm__ volatile("mov $1, %%rax\n\t"
+                         "mov $1, %%rdi\n\t"
+                         "mov %[buf], %%rsi\n\t"
+                         "mov %[len], %%rdx\n\t"
+                         "syscall"
+                         : : [buf] "r"(str), [len] "r"(len)
+                         : "rax", "rdi", "rsi", "rdx", "rcx", "r11", "memory");
+#elif defined(__aarch64__)
+        register long x8 asm("x8") = SYS_write;
+        register long x0 asm("x0") = 1;
+        register const char *x1 asm("x1") = str;
+        register long x2 asm("x2") = (long)len;
+        __asm__ volatile("svc #0"
+                         : : "r"(x8), "r"(x0), "r"(x1), "r"(x2)
+                         : "memory");
+#endif
+}
+
+static char *append_str(char *p, const char *s)
+{
+        while (*s != '\0') {
+                *p++ = *s++;
+        }
+        return p;
+}
+
+static char *append_u32(char *p, unsigned v)
+{
+        char tmp[10];
+        int n = 0;
+        int i;
+
+        if (v == 0) {
+                *p++ = '0';
+                return p;
+        }
+
+        while (v > 0) {
+                tmp[n++] = (char)('0' + (v % 10));
+                v /= 10;
+        }
+
+        for (i = n - 1; i >= 0; i--) {
+                *p++ = tmp[i];
+        }
+
+        return p;
+}
+
+static void write_child_run(int idx, int pid)
+{
+        char buf[96];
+        char *p = buf;
+
+        p = append_str(p, "Child ");
+        p = append_u32(p, (unsigned)idx);
+        p = append_str(p, ": Running with PID=");
+        p = append_u32(p, (unsigned)pid);
+        p = append_str(p, "\n");
+        *p = '\0';
+        my_write(buf);
+}
+
+static void write_child_exit(int idx, int code)
+{
+        char buf[96];
+        char *p = buf;
+
+        p = append_str(p, "Child ");
+        p = append_u32(p, (unsigned)idx);
+        p = append_str(p, ": Exiting with code ");
+        p = append_u32(p, (unsigned)code);
+        p = append_str(p, "\n");
+        *p = '\0';
+        my_write(buf);
+}
+
+static void write_parent_created(int count)
+{
+        char buf[64];
+        char *p = buf;
+
+        p = append_str(p, "Parent: Created ");
+        p = append_u32(p, (unsigned)count);
+        p = append_str(p, " children\n");
+        *p = '\0';
+        my_write(buf);
+}
+
+static void write_parent_reaped(int pid, int exit_code)
+{
+        char buf[96];
+        char *p = buf;
+
+        p = append_str(p, "Parent: Reaped PID=");
+        p = append_u32(p, (unsigned)pid);
+        p = append_str(p, ", exit_code=");
+        p = append_u32(p, (unsigned)exit_code);
+        p = append_str(p, "\n");
+        *p = '\0';
+        my_write(buf);
+}
+
+static void write_parent_all_reaped(int count)
+{
+        char buf[64];
+        char *p = buf;
+
+        p = append_str(p, "Parent: All ");
+        p = append_u32(p, (unsigned)count);
+        p = append_str(p, " children reaped\n");
+        *p = '\0';
+        my_write(buf);
+}
 
 /*
  * 基础fork+wait4测试
@@ -77,13 +209,13 @@ int test_fork_wait_basic(void)
 static void yield_cpu(void)
 {
 #if defined(__x86_64__)
-        __asm__ volatile("mov $124, %%rax\n\t"
+        __asm__ volatile("mov $24, %%rax\n\t"
                          "syscall"
                          :
                          :
                          : "rax", "rcx", "r11", "memory");
 #elif defined(__aarch64__)
-        register long x8 asm("x8") = 124; /* SYS_sched_yield */
+        register long x8 asm("x8") = SYS_sched_yield;
         register long x0 asm("x0") = 0;
         __asm__ volatile("svc #0" : "+r"(x0) : "r"(x8) : "memory");
 #endif
@@ -154,36 +286,54 @@ int test_wnohang(void)
  * 多子进程测试
  * 测试等待任意子进程 (pid == -1)
  */
+static void multiple_child_entry(int idx)
+{
+        const int code = (idx + 1) * 10;
+
+        write_child_run(idx, (int)getpid());
+        for (int j = 0; j < (idx + 1) * 64; j++) {
+                yield_cpu();
+        }
+        write_child_exit(idx, code);
+        exit(code);
+}
+
 int test_multiple_children(void)
 {
     printf("=== Multiple children test ===\n");
 
     const int NUM_CHILDREN = 3;
     pid_t children[NUM_CHILDREN];
+    int got_exit_10 = 0;
+    int got_exit_20 = 0;
+    int got_exit_30 = 0;
 
-    // 创建多个子进程
     for (int i = 0; i < NUM_CHILDREN; i++) {
-        children[i] = fork();
-        if (children[i] < 0) {
-            printf("FAIL: fork() failed for child %d\n", i);
-            return 1;
-        }
-
-        if (children[i] == 0) {
-            // 子进程
-            printf("Child %d: Running with PID=%d\n", i, getpid());
-            // 每个子进程有不同的工作时间
-            volatile int delay = (i + 1) * 10000000;
-            for (volatile int j = 0; j < delay; j++)
-                ;
-            printf("Child %d: Exiting with code %d\n", i, (i + 1) * 10);
-            exit((i + 1) * 10);
-        }
+        children[i] = -1;
     }
 
-    // 父进程等待所有子进程（顺序不确定）
-    printf("Parent: Created %d children\n", NUM_CHILDREN);
-    printf("Parent: Waiting for children (any order)...\n");
+#define SPAWN_ONE_CHILD(idx)                                                   \
+        do {                                                                   \
+                pid_t pid = fork();                                            \
+                if (pid == 0) {                                                \
+                        multiple_child_entry(idx);                             \
+                        __builtin_unreachable();                               \
+                }                                                              \
+                if (pid < 0) {                                                 \
+                        printf("FAIL: fork() failed for child %d\n", (idx));  \
+                        return 1;                                              \
+                }                                                              \
+                children[(idx)] = pid;                                           \
+        } while (0)
+
+    SPAWN_ONE_CHILD(0);
+    SPAWN_ONE_CHILD(1);
+    SPAWN_ONE_CHILD(2);
+
+#undef SPAWN_ONE_CHILD
+
+    write_parent_created(NUM_CHILDREN);
+    my_write("Parent: Waiting for children (any order)...\n");
 
     int children_reaped = 0;
     while (children_reaped < NUM_CHILDREN) {
@@ -192,7 +342,24 @@ int test_multiple_children(void)
 
         if (pid > 0) {
             int exit_code = WEXITSTATUS(status);
-            printf("Parent: Reaped PID=%d, exit_code=%d\n", pid, exit_code);
+
+            switch (exit_code) {
+            case 10:
+                    got_exit_10 = 1;
+                    break;
+            case 20:
+                    got_exit_20 = 1;
+                    break;
+            case 30:
+                    got_exit_30 = 1;
+                    break;
+            default:
+                    printf("FAIL: unexpected exit_code %d from pid %d\n",
+                           exit_code, (int)pid);
+                    return 1;
+            }
+
+            write_parent_reaped((int)pid, exit_code);
             children_reaped++;
         } else {
             printf("FAIL: wait4(-1) failed\n");
@@ -200,8 +367,14 @@ int test_multiple_children(void)
         }
     }
 
-    printf("Parent: All %d children reaped\n", NUM_CHILDREN);
-    printf("PASS: Multiple children test succeeded\n");
+    if (!got_exit_10 || !got_exit_20 || !got_exit_30) {
+            printf("FAIL: missing exit codes (10=%d 20=%d 30=%d)\n",
+                   got_exit_10, got_exit_20, got_exit_30);
+            return 1;
+    }
+
+    write_parent_all_reaped(NUM_CHILDREN);
+    my_write("PASS: Multiple children test succeeded\n");
     return 0;
 }
 
