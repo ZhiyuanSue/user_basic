@@ -139,13 +139,14 @@ void test_wait4_wnohang(void)
                 printf("[INFO] Parent: child PID=%d\n", pid);
 
                 int status;
+                int already_reaped = 0;
                 pid_t waited = wait4(pid, &status, WNOHANG, NULL);
 
                 if (waited == 0) {
                         printf("[INFO] Parent: WNOHANG returned 0 (child not exited yet)\n");
                         printf("[PASS] WNOHANG non-blocking wait works\n");
                 } else if (waited == pid) {
-                        /* Child already exited */
+                        /* Child already exited and was reaped by WNOHANG */
                         if (WIFEXITED(status)) {
                                 printf("[INFO] Parent: child already exited (exit=%d)\n",
                                        WEXITSTATUS(status));
@@ -154,20 +155,24 @@ void test_wait4_wnohang(void)
                                        (unsigned int)status);
                         }
                         printf("[INFO] WNOHANG returned child PID because child already exited\n");
+                        printf("[PASS] WNOHANG reaped exited child\n");
+                        already_reaped = 1;
                 } else {
                         printf("[FAIL] WNOHANG returned unexpected value: %d\n", waited);
                         TEST_END("wait4_wnohang");
                         return;
                 }
 
-                /* Now wait for real to clean up */
-                waited = wait4(pid, &status, 0, NULL);
-                if (waited == pid) {
-                        printf("[INFO] Parent: final wait4 succeeded (exit=%d)\n",
-                               WIFEXITED(status) ? WEXITSTATUS(status) : -1);
-                } else {
-                        printf("[FAIL] final wait4 returned wrong PID (expected %d, got %d)\n",
-                               pid, waited);
+                /* Blocking wait only if WNOHANG did not already reap the zombie */
+                if (!already_reaped) {
+                        waited = wait4(pid, &status, 0, NULL);
+                        if (waited == pid) {
+                                printf("[INFO] Parent: final wait4 succeeded (exit=%d)\n",
+                                       WIFEXITED(status) ? WEXITSTATUS(status) : -1);
+                        } else {
+                                printf("[FAIL] final wait4 returned wrong PID (expected %d, got %d)\n",
+                                       pid, waited);
+                        }
                 }
         }
 

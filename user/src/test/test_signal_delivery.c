@@ -141,12 +141,14 @@ static long my_kill(pid_t pid, int sig)
                 : [syscall] "i"(SYS_kill), "D"((long)pid), "S"((long)sig)
                 : "rcx", "r11", "memory");
 #elif defined(__aarch64__)
-        __asm__ volatile(
-                "mov x8, %[syscall]\n\t"
-                "svc #0"
-                : "=r"(result)
-                : [syscall] "i"(SYS_kill), "r"((long)pid), "r"((long)sig)
-                : "x0", "x1", "x8", "memory");
+        register long x8 asm("x8") = SYS_kill;
+        register long x0 asm("x0") = (long)pid;
+        register long x1 asm("x1") = (long)sig;
+        __asm__ volatile("svc #0"
+                         : "+r"(x0)
+                         : "r"(x8), "r"(x1)
+                         : "memory");
+        result = x0;
 #else
         result = -1;
 #endif

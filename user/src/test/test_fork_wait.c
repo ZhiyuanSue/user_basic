@@ -15,6 +15,13 @@
 #define WCONTINUED 0x00000008  /* Report continued children */
 #endif
 
+#ifndef WIFEXITED
+#define WIFEXITED(status) (((status) & 0x7f) == 0)
+#endif
+#ifndef WEXITSTATUS
+#define WEXITSTATUS(status) (((status) & 0xff00) >> 8)
+#endif
+
 /*
  * 基础fork+wait4测试
  * 测试父子进程基本通信
@@ -67,6 +74,21 @@ int test_fork_wait_basic(void)
     }
 }
 
+static void yield_cpu(void)
+{
+#if defined(__x86_64__)
+        __asm__ volatile("mov $124, %%rax\n\t"
+                         "syscall"
+                         :
+                         :
+                         : "rax", "rcx", "r11", "memory");
+#elif defined(__aarch64__)
+        register long x8 asm("x8") = 124; /* SYS_sched_yield */
+        register long x0 asm("x0") = 0;
+        __asm__ volatile("svc #0" : "+r"(x0) : "r"(x8) : "memory");
+#endif
+}
+
 /*
  * WNOHANG测试
  * 测试非阻塞等待语义
@@ -82,40 +104,49 @@ int test_wnohang(void)
     }
 
     if (pid == 0) {
-        // 子进程
+        /*
+         * Yield first so the parent can reach WNOHANG while we are still
+         * alive. Avoid huge busy-loops: on SMP + QEMU they pin vCPUs and
+         * virtual time/timer IRQs stall (looks like a hang until keyboard).
+         */
         printf("Child: Sleeping for a while...\n");
-        // 模拟长时间运行
-        for (volatile int i = 0; i < 100000000; i++)
-                ;
+        for (int i = 0; i < 256; i++) {
+                yield_cpu();
+        }
         printf("Child: Exiting\n");
         exit(0);
     } else {
-        // 父进程
-        printf("Parent: Created child PID=%d\n", pid);
-
-        // 立即检查，子进程应该还在运行
         int status;
-        pid_t result = wait4(pid, &status, WNOHANG, NULL);
+        pid_t result;
+
+        /* Parent: WNOHANG immediately after fork (before slow printf). */
+        result = wait4(pid, &status, WNOHANG, NULL);
+
+        printf("Parent: Created child PID=%d\n", pid);
 
         if (result == 0) {
             printf("Parent: WNOHANG returned 0 (child still running)\n");
             printf("PASS: WNOHANG works correctly\n");
-        } else {
-            printf("FAIL: WNOHANG should return 0 when child running\n");
-            return 1;
-        }
 
-        // 现在真正等待子进程
-        printf("Parent: Now waiting for child to finish...\n");
-        result = wait4(pid, &status, 0, NULL);
-
-        if (result == pid) {
-            printf("Parent: Child exited normally\n");
-            return 0;
-        } else {
+            printf("Parent: Now waiting for child to finish...\n");
+            result = wait4(pid, &status, 0, NULL);
+            if (result == pid) {
+                printf("Parent: Child exited normally\n");
+                return 0;
+            }
             printf("FAIL: wait4 failed\n");
             return 1;
         }
+
+        if (result == pid) {
+            printf("Parent: WNOHANG reaped already-exited child (exit=%d)\n",
+                   WIFEXITED(status) ? WEXITSTATUS(status) : -1);
+            printf("PASS: WNOHANG reaped exited child\n");
+            return 0;
+        }
+
+        printf("FAIL: WNOHANG returned unexpected value: %d\n", (int)result);
+        return 1;
     }
 }
 
