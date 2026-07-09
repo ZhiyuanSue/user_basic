@@ -10,6 +10,11 @@ Thanks to Azure
 
 I have changed some thing for my test
 
+## RendezvOS (initramfs / cpio mode)
+
+See **[RENDEZVOS.md](RENDEZVOS.md)** for how ELFs are packed into `rootfs/tests/`
+instead of kernel `link_app.o`. Execve tests use paths like `/tests/test_echo`.
+
 The following is the original readme
 
 ## riscv syscalls测试用例

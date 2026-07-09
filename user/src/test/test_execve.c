@@ -3,12 +3,9 @@
 #include "unistd.h"
 
 /*
- * Phase 3a execve test
+ * Phase 3 execve test (initramfs / VFS)
  *
- * This test verifies basic execve functionality:
- * - Simple execve with embedded ELF
- * - argv passing
- * - Process replacement
+ * Target ELF: /tests/test_execve_simple (see RendezvOS rootfs/tests/)
  */
 
 void test_execve_basic(void)
@@ -17,12 +14,10 @@ void test_execve_basic(void)
 
         printf("  Testing basic execve...\n");
 
-        /* Prepare argv for test_execve_simple (simple test in test directory) */
         char *newargv[] = {"test_execve_simple", NULL};
         char *newenviron[] = {NULL};
 
-        /* This should replace current process with test_execve_simple */
-        execve("test_execve_simple", newargv, newenviron);
+        execve("/tests/test_execve_simple", newargv, newenviron);
 
         /* If we reach here, execve failed */
         printf("  ERROR: execve returned unexpectedly!\n");
